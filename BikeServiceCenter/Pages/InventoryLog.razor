@@ -1,0 +1,104 @@
+﻿@page "/inventoryLog"
+
+
+<nav class="navbar navbar-light bg-light justify-content-between">
+    <h1 class="navbar-brand mb-0 h1">Inventory Log</h1>
+    <div class="d-flex">
+       <!--Dropdown menu to select month-->
+        <form >
+            <label>Select a month:</label>
+            <select name="month" @bind="_month">
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+            </select>
+        </form>
+    </div>
+</nav>
+
+<!--Table heading-->
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                <div class="d-flex">
+                    SN
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Item Name
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Quantity
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Taken by
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Approved by
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Date taken out
+                </div>
+            </th>
+        </tr>
+    </thead>
+    <!--Table body-->
+    <tbody>
+        @{
+            IEnumerable<ItemRecord> itemsRecordList = _itemsRecord;          
+            if (_month != null)
+            {
+                itemsRecordList = _itemsRecord.Where(t =>t.TakenOutAt.Month == _month); // Displays the inventory log of the month selected by the admin
+            }
+            var index = 1; // To display serial number
+            foreach (var items in itemsRecordList)
+            {
+                <tr>
+                    @if (items.IsApproved)  // Checks if the item is approved by the admin and displays the list of approved items
+                    {
+                        <td class="">@index</td>
+                        <td class="">@items.ItemName</td>
+                        <td class="">@items.Quantity</td>
+                        <td class="">@items.TakenBy</td>
+                        <td class="">@items.ApprovedBy</td>
+                        <td class="">@items.TakenOutAt</td>    
+                    }
+                </tr>
+                index++;
+            }
+        }
+    </tbody>
+</table>
+
+
+@code {
+
+    private List<ItemRecord> _itemsRecord { get; set; }
+    private int ?_month { get; set; }
+
+    // Stores the data of the inventory log on initialize
+    protected override void OnInitialized()
+    {
+        _itemsRecord = ItemRecordService.GetAll();
+    }
+ 
+}

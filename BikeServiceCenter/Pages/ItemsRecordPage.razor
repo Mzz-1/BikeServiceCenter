@@ -1,0 +1,230 @@
+﻿@page "/itemsRecord"
+
+
+<nav class="navbar navbar-light bg-light justify-content-between">
+    <h1 class="navbar-brand mb-0 h1">Items Request</h1>
+</nav>
+
+<!--Table heading-->
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                <div class="d-flex">
+                    SN
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Item Name
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Quantity
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                   Requested by
+                </div>
+            </th>
+
+        </tr>
+    </thead>
+
+    <!--Table body-->
+    <tbody>
+        @{
+            IEnumerable<ItemRecord> itemsRecordList = _itemsRecord;
+            bool buttonDisable;
+            int index = 1;  // To display serial number
+
+            foreach (var items in itemsRecordList)  // Displays all the data of requested items 
+            {
+                if (items.IsApproved == true)    // Disables the approve and decline button after an action has been performed
+                {
+                    buttonDisable = true;
+                }
+                else if (items.IsDeclined == true)
+                {
+                    buttonDisable = true;
+                }
+                else {
+                    buttonDisable = false;
+                }
+                <tr>
+                    <td class="">@index</td>
+                            <td class="">@items.ItemName</td>
+                            <td class="">@items.Quantity</td>
+                            <td class="">@items.TakenBy</td>
+                            <td>
+                                <button class="btn btn-outline-secondary" type="button"
+                            @onclick="()=>OpenApproveDialog(items)" disabled=@buttonDisable>    
+                                    <span class="oi oi-pencil" /> Approve
+                                </button>
+                                <button class="btn btn-outline-secondary" type="button"
+                            @onclick="()=>OpenDeclineDialog(items)" disabled=@buttonDisable>
+                                    <span class="oi oi-pencil" /> Decline
+                                </button>
+
+                                  
+
+                            </td>
+                </tr>
+                index++;
+            }
+        }
+    </tbody>
+</table>
+
+<!--Displays the diaglog box to approve the requested item-->
+@if (_showRequestApproveDialog)
+{
+    <Dialog Title="@_dialogTitle" OnClose="@OnApproveDialogClose" OkLabel="@_dialogOkLabel">
+        <div class="form-floating">
+            <p>Approve the following request?</p>
+        </div>
+
+
+        @if (!string.IsNullOrEmpty(_requestItemErrorMessage))
+        {
+            <AlertBox Type="danger" Message="@_requestItemErrorMessage" />
+        }
+    </Dialog>
+}
+
+<!--Displays the diaglog box to decline the requested item-->
+@if (_showRequestDeclineDialog)
+{
+    <Dialog Title="@_dialogTitle" OnClose="@OnDeclineDialogClose" OkLabel="@_dialogOkLabel">
+        <div class="form-floating">
+            <p>Decline the following request?</p>
+        </div>
+
+
+        @if (!string.IsNullOrEmpty(_declineItemErrorMessage))
+        {
+            <AlertBox Type="danger" Message="@_declineItemErrorMessage" />
+        }
+    </Dialog>
+}
+
+
+
+@code {
+    [CascadingParameter]
+    private GlobalState _globalState { get; set; }
+    private bool _showRequestDeclineDialog { get; set; }
+    private bool _showRequestApproveDialog { get; set; }
+    private bool _showDeleteItemDialog { get; set; }
+    private List<Item> _items { get; set; }
+    private List<ItemRecord> _itemsRecord { get; set; }
+    private Item _deleteItem { get; set; }
+    private string _dialogTitle { get; set; }
+    private string _dialogOkLabel { get; set; }
+    private string _declineItemErrorMessage { get; set; }
+    private string _requestItemErrorMessage { get; set; }
+    private string _deleteItemErrorMessage { get; set; }
+    private Item _itemModel { get; set; }
+    private ItemRecord _itemRecordModel { get; set; }
+    private string _tabFilter = "All";
+    private string _sortBy = "dueDate";
+    private string _sortDirection = "ascending";
+    DateTime currentTime = DateTime.Now;
+
+    protected override void OnInitialized()
+    {
+        _itemsRecord = ItemRecordService.GetAll();
+        _items = ItemService.GetAll();
+    }
+
+    // Displays  
+    private void OpenApproveDialog(ItemRecord reqItem)
+    {
+        _dialogTitle = "Approve Request";
+        _dialogOkLabel = "Approve";
+
+        _itemRecordModel = reqItem;
+
+        _showRequestApproveDialog = true;
+    }
+
+    private void OpenDeclineDialog(ItemRecord reqItem)
+    {
+        _dialogTitle = "Decline Request";
+        _dialogOkLabel = "Decline";
+
+        _itemRecordModel = reqItem;
+
+        _showRequestDeclineDialog = true;
+    }
+
+    private void OnApproveDialogClose(bool isCancel)
+    {
+        if (isCancel)
+        {
+            _requestItemErrorMessage = "";
+            _showRequestApproveDialog = false;
+        }
+        else
+        {
+            try
+            {
+                
+                if (currentTime.DayOfWeek >= DayOfWeek.Monday && currentTime.DayOfWeek <= DayOfWeek.Friday && currentTime.Hour >= 9 && currentTime.Hour < 16)   
+                {
+                   
+                   
+                    _itemsRecord = ItemRecordService.ApproveRequest(_globalState.CurrentUser.Username, _itemRecordModel.Id, _itemRecordModel.ItemName, _itemRecordModel.Quantity);
+                }
+                else { 
+                    _requestItemErrorMessage = "The request can only be approved between 9:00 am to 4:00 pm [Monday to Friday].";
+                    _showRequestApproveDialog = true;
+                    return;
+                }
+
+                _showRequestApproveDialog = false;
+            }
+            catch (Exception e)
+            {
+                _requestItemErrorMessage = e.Message;
+            }
+        }
+    }
+
+    private void OnDeclineDialogClose(bool isCancel)
+    {
+        if (isCancel)
+        {
+            _requestItemErrorMessage = "";
+            _showRequestDeclineDialog = false;
+        }
+        else
+        {
+            try
+            {
+                if (currentTime.DayOfWeek >= DayOfWeek.Monday && currentTime.DayOfWeek <= DayOfWeek.Friday && currentTime.Hour >= 9 && currentTime.Hour < 16)
+                {
+                    _declineItemErrorMessage = "";
+
+                    _itemsRecord = ItemRecordService.DeclineRequest(_globalState.CurrentUser.Username, _itemRecordModel.Id, _itemRecordModel.ItemName, _itemRecordModel.Quantity);
+                }
+                else
+                {
+                    _declineItemErrorMessage = "The request can only be declined between 9:00 am to 4:00 pm [Monday to Friday].";
+                    _showRequestDeclineDialog = true;
+                    return;
+                }
+
+                _showRequestDeclineDialog = false;
+            }
+            catch (Exception e)
+            {
+                _declineItemErrorMessage = e.Message;
+            }
+            _showRequestDeclineDialog = false;
+        }
+    }
+
+}

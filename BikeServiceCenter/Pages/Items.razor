@@ -1,0 +1,366 @@
+﻿@page "/items"
+
+
+<nav class="navbar navbar-light bg-light justify-content-between">
+    <h1 class="navbar-brand mb-0 h1">Items</h1>
+    <div class="d-flex">
+        <input type="search" class="form-control search" placeholder="Search" @oninput="SearchItemName" />
+    </div>
+    <p>
+        Sort by Date Added
+        <a class='btn text-@(_sortBy == "DateAdded" ? "primary" : "secondary") p-0 m-0' data-mdb-toggle="tooltip"
+           @onclick='()=>SortByHandler("DateAdded")'>
+            <span class='oi oi-sort-@(_sortBy == "DateAdded" ? _sortDirection : "ascending")'> </span>
+        </a>
+       
+    </p>
+
+    @if (_globalState.CurrentUser?.Role == Role.Admin)  // Only allows the admin to add new items
+    {
+        <button class="btn btn-primary" type="button" @onclick="OpenAddItemDialog">
+            <span class="oi oi-plus" /> Add
+        </button>
+        }
+    </nav>
+
+<!--Table heading-->
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                <div class="d-flex">
+                    SN
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Item Name
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Quantity
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Date Added
+                </div>
+            </th>
+            <th>
+                <div class="d-flex">
+                    Last Taken Out
+                </div>
+            </th>
+        </tr>
+    </thead>
+
+    <!--Table body-->
+    <tbody>
+        @{
+            IEnumerable<Item> itemsList = _items;
+            if (_sortBy == "DateAdded")
+            {
+                itemsList = _sortDirection == "ascending" ? Algorithm.MergeSort(_items.ToList()) : itemsList.OrderByDescending(t =>
+                t.DateAdded);
+            }
+            int index = 1;
+            foreach (var item in itemsList)
+            {
+                <tr>
+                    <td class="">@index</td>
+                    <td class="">@item.ItemName</td>
+                    <td class="">@item.Quantity</td>
+                    <td class="">@item.DateAdded</td>
+                    <td class="">@item.LastTakenOut</td>
+                            <td>
+                                <button class="btn btn-outline-secondary" type="button"
+                                @onclick="()=>OpenRequestItemDialog(item)">
+                                    <span class="oi oi-pencil" /> Request
+                                </button>
+                        @if (_globalState.CurrentUser?.Role == Role.Admin)
+                        {
+                            <button  class="btn btn-outline-secondary" type="button"
+                                    @onclick="()=>OpenEditItemDialog(item)">
+                                <span class="oi oi-pencil" /> Edit
+                            </button>
+                            <button class="btn btn-outline-danger" type="button" @onclick="()=>OpenDeleteItemDialog(item)">
+                                <span class="oi oi-delete" /> Delete
+                            </button>
+                        }
+                    </td>
+
+                        
+                </tr>
+                index++;
+            }
+        }
+    </tbody>
+</table>
+
+@if (_showEditItemDialog)
+{
+    <Dialog Title="@_dialogTitle" OnClose="@OnEditItemDialogClose" OkLabel="@_dialogOkLabel">
+        
+    <div class="form-floating">
+        <input id="itemName" type="text" class="form-control" @bind="_itemModel.ItemName" placeholder="Item Name" required/>
+        <label for="itemName">Item Name</label>
+    </div>
+    <div class="form-floating">
+        <input id="quantity" type="number" class="form-control" @bind="_itemModel.Quantity">
+        <label for="quantity">Quantity</label> 
+    </div>
+
+    @if (!string.IsNullOrEmpty(_editItemErrorMessage))
+    {
+        <AlertBox Type="danger" Message="@_editItemErrorMessage" />
+    }
+    </Dialog>
+}
+
+@if (_showRequestItemDialog)
+{
+    <Dialog Title="@_dialogTitle" OnClose="@OnRequestItemDialogClose" OkLabel="@_dialogOkLabel">
+        <div class="form-floating">
+            <input id="itemName" type="text" class="form-control" @bind="_itemModel.ItemName" placeholder="Item Name" disabled/>
+            <label for="itemName">Item Name</label>
+        </div>
+        <div class="form-floating">
+            <input id="quantity" type="number" class="form-control" name="points" step="1" @bind="_requestedQuantity">
+            <label for="quantity">Quantity</label>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_requestItemErrorMessage))
+        {
+            <AlertBox Type="danger" Message="@_requestItemErrorMessage" />
+        }
+    </Dialog>
+}
+
+@if (_showDeleteItemDialog)
+{
+    <Dialog Title="Delete Item" OnClose="@OnDeleteItemDialogClose" OkLabel="Confirm">
+    <p>Are you sure you want to delete <strong>@_deleteItem.ItemName</strong> item?</p>
+    @if (!string.IsNullOrEmpty(_deleteItemErrorMessage))
+        {
+            <AlertBox Type="danger" Message="@_deleteItemErrorMessage" />
+        }
+    </Dialog>
+}
+
+@code {
+    [CascadingParameter]
+    private GlobalState _globalState { get; set; }
+    private bool _showEditItemDialog { get; set; }
+    private bool _showRequestItemDialog { get; set; }
+    private bool _showDeleteItemDialog { get; set; }
+    private List<Item> _items { get; set; }
+    private List<ItemRecord> _itemsRecord { get; set; }
+    private Item _deleteItem { get; set; }
+    private string _dialogTitle { get; set; }
+    private int _requestedQuantity { get; set; }
+    private string _dialogOkLabel { get; set; }
+    private string _editItemErrorMessage { get; set; }
+    private string _requestItemErrorMessage { get; set; }
+    private string _deleteItemErrorMessage { get; set; }
+    private Item _itemModel { get; set; }
+    private ItemRecord _itemRecordModel { get; set; }
+    private string _sortBy = "dueDate";
+    private string _sortDirection = "ascending";
+    DateTime currentTime = DateTime.Now;
+
+    protected override void OnInitialized()
+    {
+        _items = ItemService.GetAll();
+    }
+
+    private void SortByHandler(string sortByDate)
+    {
+        if (_sortBy == sortByDate)
+        {
+            _sortDirection = _sortDirection == "ascending" ? "descending" : "ascending";
+        }
+        else
+        {
+            _sortBy = sortByDate;
+            _sortDirection = "ascending";
+        }
+    }
+
+
+    private void OpenAddItemDialog()
+    {
+        _dialogTitle = "Add Item";
+        _dialogOkLabel = "Add";
+        _itemModel = new Item();
+        _itemModel.Id = Guid.Empty;
+        _showEditItemDialog = true;
+    }
+
+    private void SearchItemName(ChangeEventArgs e)
+    {
+        var searchTerm = e.Value.ToString();
+        if (!string.IsNullOrEmpty(searchTerm) && searchTerm.Length > 2)
+        {
+            _items = ItemService.GetAll().Where(t =>
+            t.ItemName.ToLower().Contains(searchTerm.ToLower())).ToList();
+        }
+        else
+        {
+            _items = ItemService.GetAll();
+        }
+    }
+
+    private void OpenEditItemDialog(Item editItem)
+    {
+        _dialogTitle = "Edit Item";
+        _dialogOkLabel = "Save";
+
+        _itemModel = editItem;
+
+        _showEditItemDialog = true;
+    }
+
+    private void OpenRequestItemDialog(Item reqItem)
+    {
+        _dialogTitle = "Request Item";
+        _dialogOkLabel = "Request";
+
+        _itemModel = reqItem;
+
+        _showRequestItemDialog = true;
+    }
+
+    private void OpenDeleteItemDialog(Item deleteItem)
+    {
+        _deleteItem = deleteItem;
+        _showDeleteItemDialog = true;
+    }
+
+
+    private void OnEditItemDialogClose(bool isCancel)
+    {
+        if (isCancel)
+        {
+            _editItemErrorMessage = "";
+            _showEditItemDialog = false;
+
+        }
+        else
+        {
+            try
+            {
+                _editItemErrorMessage = "";
+                if (_itemModel.Id == Guid.Empty)
+                {
+
+                    if (string.IsNullOrEmpty(_itemModel.ItemName))
+                    {
+                        _editItemErrorMessage = "Item name cannot be empty.";
+                        return;
+                    }
+                    else if (_itemModel.Quantity < 1)
+                    {
+                        _editItemErrorMessage = "Please add quantity";
+                        return;
+                    }
+                    else { 
+                        _items = ItemService.Create(_globalState.CurrentUser.Id, _itemModel.ItemName, _itemModel.Quantity);
+
+                    } 
+                }
+                else
+                {
+                    if (string.IsNullOrEmpty(_itemModel.ItemName))
+                    {
+                        _editItemErrorMessage = "Item name cannot be empty.";
+                        return;
+                    }
+                    else if (_itemModel.Quantity < 1)
+                    {
+                        _editItemErrorMessage = "Please add quantity";
+                        return;
+                    }
+                    else { 
+                        _items = ItemService.Update(_itemModel.Id, _itemModel.ItemName, _itemModel.Quantity);
+                    }
+                }
+                _showEditItemDialog = false;
+            }
+            catch (Exception e)
+            {
+                _editItemErrorMessage = e.Message;
+            }
+        }
+    }
+
+    private void OnRequestItemDialogClose(bool isCancel)
+    {
+        if (isCancel)
+        {
+            _requestItemErrorMessage = "";
+            _showRequestItemDialog = false;
+        }
+        else
+        {
+            try
+            {
+                if (currentTime.DayOfWeek >= DayOfWeek.Monday && currentTime.DayOfWeek <= DayOfWeek.Friday && currentTime.Hour >= 9 && currentTime.Hour < 16)
+                {
+                    if (_requestedQuantity < 1)
+                    {
+                        _requestItemErrorMessage = "Please select the quantity.";
+                        return;
+                    }
+                    else if (_requestedQuantity > _itemModel.Quantity)
+                    {
+                        _requestItemErrorMessage = "The request could not be processed as there are not enough items in stock.";
+                        return;
+                    }
+                    else
+                    {
+                        _requestItemErrorMessage = "";
+                        _itemsRecord = ItemRecordService.CreateRequest(_globalState.CurrentUser.Username, _itemModel.Id, _itemModel.ItemName, _requestedQuantity);
+                        _requestedQuantity = 0;
+                    }
+                }
+                else { 
+                    _requestItemErrorMessage = "The request can only be declined between 9:00 am to 4:00 pm [Monday to Friday].";
+                    return;
+                }
+
+                _showRequestItemDialog = false;
+            }
+            catch (Exception e)
+            {
+                _requestItemErrorMessage = e.Message;
+            }
+        }
+    }
+
+    private void OnDeleteItemDialogClose(bool isCancel)
+    {
+        if (isCancel)
+        {
+
+            _showDeleteItemDialog = false;
+            _deleteItem = null;
+        }
+        else
+        {
+            try
+            {
+                _deleteItemErrorMessage = "";
+                _items = ItemService.Delete(_globalState.CurrentUser.Id, _deleteItem.Id);
+                _showDeleteItemDialog = false;
+                _deleteItem = null;
+            }
+            catch (Exception e)
+            {
+                _deleteItemErrorMessage = e.Message;
+            }
+        }
+    }
+
+
+}

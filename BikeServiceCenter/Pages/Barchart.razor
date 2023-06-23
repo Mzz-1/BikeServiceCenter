@@ -1,0 +1,74 @@
+﻿@page "/bargraph"
+
+@using ChartJs.Blazor.BarChart;
+
+@using BikeServiceCenter.Data.Model;
+
+<h1>Bar graph</h1>
+
+<Chart Config="_barConfig"></Chart>
+
+@code {
+    private List<ItemRecord> _logs { get; set; }
+    private BarConfig _barConfig;
+    private string[] _uniqeLabels { get; set; }
+
+    // fetch the list of logs and render chart on page mount
+    protected override void OnInitialized()
+    {
+        _logs = ItemRecordService.GetAll();
+        ConfigureBarConfig();
+    }
+
+    private string[] UniqueItemLabels(List<ItemRecord> logs)
+    {
+        var items = logs.Where(x => x.IsApproved == true);
+        // create a set for unique labels
+        HashSet<string> uniqueLabels = new HashSet<string>();
+
+        // insert labels into the set
+        foreach (var log in items)
+        {
+            uniqueLabels.Add(log.ItemName);
+        }
+
+        // return an array of unique labels
+        return uniqueLabels.ToArray();
+    }
+
+    private void ConfigureBarConfig()
+    {
+        _barConfig = new BarConfig();
+
+        _barConfig.Options = new BarOptions
+        {
+            Responsive = true,
+            Title = new OptionsTitle
+            {
+                Display = true,
+                Text = "Item Transaction",
+            },
+        };
+
+        // label each bar
+        foreach (var label in UniqueItemLabels(_logs))
+        {
+            _barConfig.Data.Labels.Add(label);
+        }
+
+        BarDataset<int> dataset = new BarDataset<int>();
+        dataset.Label = "Item Quantity";
+
+
+        var items = _logs.Where(x=>x.IsApproved==true).GroupBy(log => log.ItemName).Select(i => new {Item = i.Key, Quantity = i.Sum(log => log.Quantity)});
+
+        // insert the quantity of each items
+        foreach (var item in items)
+        {
+            dataset.Add(item.Quantity);
+        }
+
+        dataset.BackgroundColor = "#2E8BC0";
+        _barConfig.Data.Datasets.Add(dataset);
+    }
+}
